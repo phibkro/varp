@@ -3,6 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 
 import { editInsertAfter, editInsertBefore, editReplace } from "./Editor.js";
+import type { AstPlugin } from "./Plugin.js";
+import { TsAstPluginImpl } from "./TsPlugin.js";
 
 mkdirSync("/tmp/claude", { recursive: true });
 
@@ -185,6 +187,126 @@ describe("workspace boundary", () => {
         dir,
       );
       expect(result.success).toBe(true);
+    }),
+  );
+});
+
+// ── astPlugin parameter ──
+
+describe("editReplace with astPlugin", () => {
+  test(
+    "uses plugin locateSymbol and validateSyntax",
+    withTempFile(FIXTURE, async (filePath) => {
+      const result = await editReplace(
+        filePath,
+        "greet",
+        "export function greet(name: string): string {\n  return `Hi ${name}`;\n}",
+        undefined,
+        false,
+        TsAstPluginImpl,
+      );
+      expect(result.success).toBe(true);
+      const updated = readFileSync(filePath, "utf-8");
+      expect(updated).toContain("Hi ${name}");
+    }),
+  );
+
+  test(
+    "plugin validateSyntax rejects bad replacement",
+    withTempFile(FIXTURE, async (filePath) => {
+      const before = readFileSync(filePath, "utf-8");
+      const result = await editReplace(
+        filePath,
+        "greet",
+        "export function greet( {{{",
+        undefined,
+        false,
+        TsAstPluginImpl,
+      );
+      expect(result.success).toBe(false);
+      expect(result.syntaxError).toBe(true);
+      expect(readFileSync(filePath, "utf-8")).toBe(before);
+    }),
+  );
+
+  test(
+    "plugin locateSymbol returns not found for missing symbol",
+    withTempFile(FIXTURE, async (filePath) => {
+      const result = await editReplace(
+        filePath,
+        "nonexistent",
+        "const x = 1;",
+        undefined,
+        false,
+        TsAstPluginImpl,
+      );
+      expect(result.success).toBe(false);
+      expect(result.syntaxErrorMessage).toContain("nonexistent");
+    }),
+  );
+
+  test(
+    "plugin validateSyntax catches full-file errors after splice",
+    withTempFile(FIXTURE, async (filePath) => {
+      let callCount = 0;
+      const spyPlugin: AstPlugin["Type"] = {
+        ...TsAstPluginImpl,
+        validateSyntax: (source, path) => {
+          callCount++;
+          return TsAstPluginImpl.validateSyntax(source, path);
+        },
+      };
+      const result = await editReplace(
+        filePath,
+        "greet",
+        "export function greet(name: string): string {\n  return `Hi ${name}`;\n}",
+        undefined,
+        false,
+        spyPlugin,
+      );
+      expect(result.success).toBe(true);
+      // validateSyntax called twice: once for fragment, once for full file
+      expect(callCount).toBe(2);
+    }),
+  );
+});
+
+describe("editInsertAfter with astPlugin", () => {
+  test(
+    "uses plugin for locate and post-splice validation",
+    withTempFile(FIXTURE, async (filePath) => {
+      const result = await editInsertAfter(
+        filePath,
+        "greet",
+        "\nexport function farewell(): string {\n  return 'Goodbye';\n}\n",
+        undefined,
+        false,
+        TsAstPluginImpl,
+      );
+      expect(result.success).toBe(true);
+      const content = readFileSync(filePath, "utf-8");
+      expect(content).toContain("farewell");
+      expect(content).toContain("greet");
+    }),
+  );
+});
+
+describe("editInsertBefore with astPlugin", () => {
+  test(
+    "uses plugin for locate and post-splice validation",
+    withTempFile(FIXTURE, async (filePath) => {
+      const result = await editInsertBefore(
+        filePath,
+        "greet",
+        "// greeting\n",
+        undefined,
+        false,
+        TsAstPluginImpl,
+      );
+      expect(result.success).toBe(true);
+      const content = readFileSync(filePath, "utf-8");
+      expect(content).toContain("// greeting");
+      expect(content.indexOf("// greeting")).toBeLessThan(content.indexOf("export function greet"));
     }),
   );
 });
