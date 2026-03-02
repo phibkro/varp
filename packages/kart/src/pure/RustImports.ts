@@ -18,8 +18,12 @@ import { extractSymbols, initTreeSitterParser, isParserReady } from "./TreeSitte
 import type { FileImports, ImportEntry } from "./types.js";
 
 // Re-export for convenience
-export const initRustParser = () => initTreeSitterParser(RustGrammar).then(() => {});
-export const isRustParserReady = () => isParserReady(RustGrammar);
+export const initRustParser = async () => {
+  const cached = await initTreeSitterParser(RustGrammar);
+  rustParser = cached.parser;
+  rustQuery = cached.query;
+};
+export const isRustParserReady = () => isParserReady(RustGrammar) && rustQuery !== null;
 
 // ── Parser access ──
 
@@ -63,7 +67,12 @@ export function extractRustFileImports(
   }
 
   // Exported names from pub items (reuse factory extractSymbols)
-  const symbols = rustQuery ? extractSymbols(parser, rustQuery, source, filename, RustHooks) : [];
+  if (!rustQuery) {
+    throw new Error(
+      "Rust symbol query not initialized — call ensureRustImportParser() or initRustParser() before extraction",
+    );
+  }
+  const symbols = extractSymbols(parser, rustQuery, source, filename, RustHooks);
   const exportedNames = symbols.filter((s) => s.exported).map((s) => s.name);
 
   // isBarrel: all top-level items are `pub use`, no local declarations

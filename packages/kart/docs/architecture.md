@@ -7,7 +7,7 @@
 kart is an MCP server providing progressive code disclosure, behavioral coupling, impact analysis, workspace navigation, AST-aware editing, import graph analysis, and reference-aware rename. Twenty-four tools across five categories:
 
 - **LSP-backed** (Effect runtime): `kart_zoom`, `kart_impact`, `kart_deps`, `kart_references`, `kart_rename`, `kart_definition`, `kart_type_definition`, `kart_implementation`, `kart_code_actions`, `kart_expand_macro`, `kart_inlay_hints`, `kart_workspace_symbol` — require `typescript-language-server` (TS) or `rust-analyzer` (Rust), routed by file extension
-- **Cached navigation**: `kart_find` (oxc-parser for TS, tree-sitter for non-TS languages, mtime-cached symbols) — first call scans full workspace, subsequent calls near-instant
+- **Cached navigation**: `kart_find` (plugin registry: oxc-parser for TS, tree-sitter for Rust/PHP/..., mtime-cached symbols) — first call scans full workspace, subsequent calls near-instant
 - **Stateless navigation**: `kart_search` (ripgrep), `kart_list` (fs), `kart_cochange` (SQLite), `kart_diagnostics` (oxlint for TS, cargo clippy for Rust), `kart_imports` (oxc-parser for TS, tree-sitter via plugin registry), `kart_importers` (oxc-parser for TS, tree-sitter via plugin registry), `kart_unused_exports` (oxc-parser for TS, tree-sitter via plugin registry)
 - **Stateless editing**: `kart_replace`, `kart_insert_after`, `kart_insert_before` — oxc-parser (TS) / tree-sitter via plugin registry (Rust, PHP, ...) for symbol location + syntax validation, optional post-edit formatting (oxfmt/rustfmt), oxlint for diagnostics
 - **Server lifecycle**: `kart_restart` — disposes all LSP runtimes (TS + Rust) + clears symbol cache + restarts file watcher
@@ -285,7 +285,7 @@ All error types defined in `src/pure/Errors.ts`.
 | `pure/OxcSymbols.test.ts` | 14 | parseSymbols for all TS declaration kinds, exports, line numbers |
 | `pure/RustSymbols.test.ts` | 9 | Rust symbol extraction via tree-sitter factory — all declaration kinds, pub detection, impl naming |
 | `pure/TreeSitterPlugin.test.ts` | 18 | generic tree-sitter factory — parser init/caching, symbol extraction, validation, makeTreeSitterPlugin contract |
-| `pure/AstEdit.test.ts` | 14 | locateSymbol, validateSyntax, splice operations (TS + Rust) |
+| `pure/AstEdit.test.ts` | 14 | locateSymbol, validateSyntax, splice operations (TS only) |
 | `pure/Resolve.test.ts` | 17 | loadTsconfigPaths, resolveAlias, resolveSpecifier, extends chain, node_modules, edge cases |
 | `pure/ImportGraph.test.ts` | 23 | extractFileImports, buildImportGraph, transitiveImporters, barrel expansion, local re-exports, default exports |
 | `pure/RustImports.test.ts` | 21 | tree-sitter Rust use extraction, crate-relative resolution, grouped imports |

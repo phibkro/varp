@@ -66,7 +66,7 @@ impl Config {
     const symbols = extractSymbols(parser, query, source, "lib.rs", RustHooks);
     const names = symbols.map((s) => s.name);
     expect(names).toContain("Config");
-    expect(names).toContain("Config"); // impl
+    expect(names.filter((n) => n === "Config")).toHaveLength(2); // struct + impl
     // "new" is nested inside impl — should NOT appear
     expect(names).not.toContain("new");
   });

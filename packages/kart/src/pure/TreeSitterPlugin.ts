@@ -52,9 +52,13 @@ type CachedParser = {
 const parserCache = new Map<string, CachedParser>();
 let treeSitterInitialized = false;
 
-/** Initialize a tree-sitter parser for the given grammar. Cached per wasmFile. */
+const cacheKeyOf = (grammar: TreeSitterGrammar): string =>
+  `${grammar.wasmFile}::${grammar.symbolQuery}`;
+
+/** Initialize a tree-sitter parser for the given grammar. Cached per wasmFile + symbolQuery. */
 export async function initTreeSitterParser(grammar: TreeSitterGrammar): Promise<CachedParser> {
-  const cached = parserCache.get(grammar.wasmFile);
+  const cacheKey = cacheKeyOf(grammar);
+  const cached = parserCache.get(cacheKey);
   if (cached) return cached;
 
   const TreeSitter = (await import("web-tree-sitter")).default;
@@ -63,11 +67,8 @@ export async function initTreeSitterParser(grammar: TreeSitterGrammar): Promise<
     treeSitterInitialized = true;
   }
 
-  const wasmPath = resolve(
-    import.meta.dir,
-    "../../node_modules/tree-sitter-wasms/out",
-    grammar.wasmFile,
-  );
+  const pkgJsonPath = Bun.resolveSync("tree-sitter-wasms/package.json", import.meta.dir);
+  const wasmPath = resolve(pkgJsonPath, "..", "out", grammar.wasmFile);
   const lang = await TreeSitter.Language.load(wasmPath);
 
   const parser = new TreeSitter();
@@ -76,13 +77,13 @@ export async function initTreeSitterParser(grammar: TreeSitterGrammar): Promise<
   const query = lang.query(grammar.symbolQuery);
 
   const entry: CachedParser = { parser, query };
-  parserCache.set(grammar.wasmFile, entry);
+  parserCache.set(cacheKey, entry);
   return entry;
 }
 
 /** Check if a parser for the given grammar is already initialized. */
 export function isParserReady(grammar: TreeSitterGrammar): boolean {
-  return parserCache.has(grammar.wasmFile);
+  return parserCache.has(cacheKeyOf(grammar));
 }
 
 // ── Symbol extraction ──

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -205,7 +205,7 @@ describe("symbol cache", () => {
 describe("findSymbols — Rust", () => {
   let registry: PluginRegistry["Type"];
 
-  test("init registry with Rust plugin", async () => {
+  beforeAll(async () => {
     const rustAst = await makeRustAstPlugin();
     registry = makeRegistry([TsAstPluginImpl, rustAst], []);
   });

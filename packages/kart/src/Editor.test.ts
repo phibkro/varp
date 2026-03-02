@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -322,7 +322,7 @@ pub const MAX: i32 = 100;
 describe("Rust editReplace", () => {
   let rustPlugin: AstPlugin["Type"];
 
-  test("init Rust plugin", async () => {
+  beforeAll(async () => {
     rustPlugin = await makeRustAstPlugin();
   });
 
@@ -385,7 +385,7 @@ describe("Rust editReplace", () => {
 describe("Rust editInsertAfter", () => {
   let rustPlugin: AstPlugin["Type"];
 
-  test("init Rust plugin", async () => {
+  beforeAll(async () => {
     rustPlugin = await makeRustAstPlugin();
   });
 

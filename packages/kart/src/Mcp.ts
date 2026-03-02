@@ -50,7 +50,7 @@ import {
 } from "./Imports.js";
 import { listDirectory, type ListArgs } from "./List.js";
 import { makePhpAstPlugin, PhpLspPluginImpl } from "./PhpPlugin.js";
-import { PluginUnavailableError } from "./Plugin.js";
+import { type AstPlugin, PluginUnavailableError } from "./Plugin.js";
 import { makeRegistryFromPlugins, makeLspRuntimes } from "./PluginLayers.js";
 import type { DepsResult, ImpactResult } from "./pure/types.js";
 import { makeRustAstPlugin, RustLspPluginImpl } from "./RustPlugin.js";
@@ -217,10 +217,13 @@ function createServer(config: ServerConfig = {}): McpServer {
     lsp: [TsLspPluginImpl, RustLspPluginImpl, PhpLspPluginImpl],
   });
 
-  Promise.all([makeRustAstPlugin(), makePhpAstPlugin()])
-    .then(([rustAst, phpAst]) => {
+  Promise.allSettled([makeRustAstPlugin(), makePhpAstPlugin()])
+    .then((results) => {
+      const ast: AstPlugin["Type"][] = [TsAstPluginImpl];
+      if (results[0].status === "fulfilled") ast.push(results[0].value);
+      if (results[1].status === "fulfilled") ast.push(results[1].value);
       registry = makeRegistryFromPlugins({
-        ast: [TsAstPluginImpl, rustAst, phpAst],
+        ast,
         lsp: [TsLspPluginImpl, RustLspPluginImpl, PhpLspPluginImpl],
       });
     })

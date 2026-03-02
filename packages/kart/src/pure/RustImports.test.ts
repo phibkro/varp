@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type Parser from "web-tree-sitter";
 
 import { RustGrammar } from "../RustPlugin.js";
-import { extractRustFileImports, rustResolve } from "./RustImports.js";
+import { ensureRustImportParser, extractRustFileImports, rustResolve } from "./RustImports.js";
 import { initTreeSitterParser } from "./TreeSitterPlugin.js";
 
 mkdirSync("/tmp/claude", { recursive: true });
@@ -18,6 +18,7 @@ let parser: Parser;
 beforeAll(async () => {
   const cached = await initTreeSitterParser(RustGrammar);
   parser = cached.parser;
+  await ensureRustImportParser();
 });
 
 // ── Extraction tests ──
