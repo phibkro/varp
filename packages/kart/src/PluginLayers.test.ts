@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+
 import { Effect, Either, Option } from "effect";
 
 import { PluginUnavailableError } from "./Plugin.js";
@@ -89,9 +90,7 @@ describe("makeLspRuntimes", () => {
     const registry = makeRegistryFromPlugins({ ast: [], lsp: [fakeLsp] });
     const runtimes = makeLspRuntimes(registry, "/tmp/claude/test-root");
 
-    const result = await Effect.runPromise(
-      Effect.either(runtimes.runtimeFor("main.go")),
-    );
+    const result = await Effect.runPromise(Effect.either(runtimes.runtimeFor("main.go")));
 
     expect(Either.isLeft(result)).toBe(true);
     if (Either.isLeft(result)) {
@@ -136,6 +135,6 @@ describe("makeLspRuntimes", () => {
     const registry = makeRegistryFromPlugins({ ast: [], lsp: [fakeLsp] });
     const runtimes = makeLspRuntimes(registry, "/tmp/claude/test-root");
 
-    await expect(runtimes.disposeAll()).resolves.toBeUndefined();
+    await runtimes.disposeAll();
   });
 });
