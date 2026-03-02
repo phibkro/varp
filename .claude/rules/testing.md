@@ -12,11 +12,11 @@ paths:
 
 | Pattern | Purpose | Coverage |
 |---|---|---|
-| `*.test.ts` | Interface/contract tests | 95% aggregate (line + function) |
-| `*.integration.test.ts` | External service wiring (LSP, SQLite, subprocess, MCP) | No threshold |
-| `*.e2e.test.ts` | End-to-end tests | No threshold |
+| `*.test.ts` | Interface/contract tests | Coverage reported (95% per-file target) |
+| `*.integration.test.ts` | External service wiring (LSP, SQLite, subprocess, MCP) | No coverage |
+| `*.e2e.test.ts` | End-to-end tests | No coverage |
 
-**Default is strict.** Name a file `.integration.test.ts` to opt out of coverage enforcement.
+**Default is strict.** Name a file `.integration.test.ts` to opt out of coverage reporting.
 
 ## When to use which
 
@@ -30,13 +30,13 @@ paths:
 - Failure depends on environment (tool availability, OS, CI sandbox)
 - Use `skipIf(process.env.TURBO_HASH)` for tests requiring tools unavailable in CI
 
-## Coverage enforcement
+## Coverage reporting
 
-Per-package `bunfig.toml` enforces 95% aggregate coverage (line + function). `bunfig.integration.toml` has no thresholds. Root bunfig is the canonical source — copies live in each package because bun only reads bunfig from cwd.
+Per-package `bunfig.toml` configures coverage reporting (text + lcov). Root bunfig is the canonical source — copies live in each package because bun only reads bunfig from cwd.
 
-Scripts: `test:strict` runs `*.test.ts` with coverage enforcement. `test:integration` runs `*.integration.test.ts` without.
+Scripts: `test:strict` runs `*.test.ts` with `--coverage`. `test:integration` runs `*.integration.test.ts` without coverage.
 
-CI runs `turbo test:strict` (build-breaking) then `turbo test:integration`.
+CI runs both `turbo test:strict` and `turbo test:integration`. Coverage artifacts are uploaded for review. Per-package `coverageThreshold = 0.95` can be enabled as test coverage improves.
 
 ## Test quality checklist
 

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { join } from "node:path";
 
 import { getImporters, getImports, getUnusedExports } from "./Imports.js";
-import { initTreeSitterParser } from "./pure/TreeSitterPlugin.js";
+import { initTreeSitterParser } from "./core/TreeSitterPlugin.js";
 import { RustGrammar } from "./RustPlugin.js";
 
 mkdirSync("/tmp/claude", { recursive: true });

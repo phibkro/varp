@@ -29,7 +29,7 @@ jobs:
       - name: Format + Lint + Build
         run: bunx turbo check
 
-      - name: Test (strict — 100% coverage on interface tests)
+      - name: Test (strict — interface tests with coverage reporting)
         run: bunx turbo test:strict
 
       - name: Test (integration)

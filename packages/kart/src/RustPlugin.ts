@@ -5,7 +5,7 @@ import {
   makeTreeSitterPlugin,
   type TreeSitterGrammar,
   type TreeSitterHooks,
-} from "./pure/TreeSitterPlugin.js";
+} from "./core/TreeSitterPlugin.js";
 
 // ── Rust grammar ──
 

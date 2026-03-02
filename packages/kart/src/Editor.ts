@@ -18,8 +18,8 @@ import {
   spliceInsertBefore,
   spliceReplace,
   validateSyntax,
-} from "./pure/AstEdit.js";
-import type { Diagnostic } from "./pure/types.js";
+} from "./core/AstEdit.js";
+import type { Diagnostic } from "./core/types.js";
 
 // ── Types ──
 

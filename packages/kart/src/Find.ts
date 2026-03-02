@@ -14,7 +14,7 @@ import { join, relative } from "node:path";
 import { Option } from "effect";
 
 import type { PluginRegistry } from "./Plugin.js";
-import { parseSymbols, type OxcSymbol } from "./pure/OxcSymbols.js";
+import { parseSymbols, type OxcSymbol } from "./core/OxcSymbols.js";
 
 // ── Types ──
 

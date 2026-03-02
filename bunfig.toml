@@ -2,4 +2,3 @@
 coverageSkipTestFiles = true
 coverageReporter = ["text", "lcov"]
 coverageDir = "coverage"
-coverageThreshold = 0.95

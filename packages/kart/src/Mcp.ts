@@ -52,7 +52,7 @@ import { listDirectory, type ListArgs } from "./List.js";
 import { makePhpAstPlugin, PhpLspPluginImpl } from "./PhpPlugin.js";
 import { type AstPlugin, PluginUnavailableError } from "./Plugin.js";
 import { makeRegistryFromPlugins, makeLspRuntimes } from "./PluginLayers.js";
-import type { DepsResult, ImpactResult } from "./pure/types.js";
+import type { DepsResult, ImpactResult } from "./core/types.js";
 import { makeRustAstPlugin, RustLspPluginImpl } from "./RustPlugin.js";
 import { searchPattern, type SearchArgs } from "./Search.js";
 import {

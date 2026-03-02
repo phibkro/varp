@@ -8,7 +8,7 @@ mkdirSync("/tmp/claude", { recursive: true });
 import { Effect, Either, Layer, ManagedRuntime } from "effect";
 
 import { LspClientLive } from "./Lsp.js";
-import { FileNotFoundError } from "./pure/Errors.js";
+import { FileNotFoundError } from "./core/Errors.js";
 import { SymbolIndex, SymbolIndexLive } from "./Symbols.js";
 
 // ── Fixtures ──
