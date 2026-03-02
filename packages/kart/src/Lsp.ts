@@ -1,9 +1,11 @@
 import { existsSync, readFileSync, watch } from "node:fs";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 
 import { Context, Effect, Layer, Scope } from "effect";
 
+import type { LspPlugin } from "./Plugin.js";
 import { LspError, LspTimeoutError } from "./pure/Errors.js";
+import { TsLspPluginImpl } from "./TsPlugin.js";
 
 export type {
   CallHierarchyItem,
@@ -294,37 +296,6 @@ class JsonRpcTransport {
   }
 }
 
-// ── Language server configuration ──
-
-export type LanguageServerConfig = {
-  /** Binary name to find/spawn. */
-  readonly binary: string;
-  /** CLI args (e.g. ["--stdio"]). */
-  readonly args: readonly string[];
-  /** Map file path → LSP languageId. */
-  readonly languageId: (path: string) => string;
-  /** File extensions to watch for changes. */
-  readonly watchExtensions: ReadonlySet<string>;
-  /** Specific filenames to watch (e.g. tsconfig.json). */
-  readonly watchFilenames: ReadonlySet<string>;
-};
-
-export const tsLanguageServer: LanguageServerConfig = {
-  binary: "typescript-language-server",
-  args: ["--stdio"],
-  languageId: (path) => (path.endsWith(".tsx") ? "typescriptreact" : "typescript"),
-  watchExtensions: new Set([".ts", ".tsx"]),
-  watchFilenames: new Set(["tsconfig.json", "package.json"]),
-};
-
-export const rustLanguageServer: LanguageServerConfig = {
-  binary: "rust-analyzer",
-  args: [],
-  languageId: () => "rust",
-  watchExtensions: new Set([".rs"]),
-  watchFilenames: new Set(["Cargo.toml", "Cargo.lock"]),
-};
-
 // ── Binary resolution ──
 
 function findLspBinary(rootDir: string, binaryName: string): string {
@@ -414,10 +385,11 @@ const SEMANTIC_TOKEN_MODIFIERS = [
 /** LSP FileChangeType enum values. */
 const FileChangeType = { Created: 1, Changed: 2, Deleted: 3 } as const;
 
-function shouldWatch(filename: string, lsConfig: LanguageServerConfig): boolean {
-  if (lsConfig.watchFilenames.has(filename)) return true;
-  for (const ext of lsConfig.watchExtensions) {
-    if (filename.endsWith(ext)) return true;
+function shouldWatch(filename: string, plugin: LspPlugin["Type"]): boolean {
+  const base = basename(filename);
+  if (plugin.watchFilenames.has(base)) return true;
+  for (const ext of plugin.watchExtensions) {
+    if (base.endsWith(ext)) return true;
   }
   return false;
 }
@@ -427,8 +399,8 @@ function shouldWatch(filename: string, lsConfig: LanguageServerConfig): boolean 
 export type LspConfig = {
   /** Absolute path to the workspace root. Defaults to process.cwd(). */
   readonly rootDir?: string;
-  /** Language server configuration. Defaults to TypeScript. */
-  readonly languageServer?: LanguageServerConfig;
+  /** Language server plugin. Defaults to TypeScript. */
+  readonly plugin?: LspPlugin["Type"];
 };
 
 export const LspClientLive = (config: LspConfig = {}): Layer.Layer<LspClient> =>
@@ -439,11 +411,11 @@ export const LspClientLive = (config: LspConfig = {}): Layer.Layer<LspClient> =>
         const scope = yield* Scope.Scope;
         const rootDir = config.rootDir ?? process.cwd();
         const rootUri = `file://${rootDir}`;
-        const lsConfig = config.languageServer ?? tsLanguageServer;
+        const plugin = config.plugin ?? TsLspPluginImpl;
 
         // Find binary
         const binary = yield* Effect.try({
-          try: () => findLspBinary(rootDir, lsConfig.binary),
+          try: () => findLspBinary(rootDir, plugin.binary),
           catch: (e) =>
             e instanceof LspError ? e : new LspError({ message: String(e), cause: e }),
         });
@@ -451,14 +423,14 @@ export const LspClientLive = (config: LspConfig = {}): Layer.Layer<LspClient> =>
         // Spawn the language server
         const proc = yield* Effect.try({
           try: () =>
-            Bun.spawn([binary, ...lsConfig.args], {
+            Bun.spawn([binary, ...plugin.args], {
               stdin: "pipe",
               stdout: "pipe",
               stderr: "pipe",
             }),
           catch: (e) =>
             new LspError({
-              message: `Failed to spawn ${lsConfig.binary}: ${String(e)}`,
+              message: `Failed to spawn ${plugin.binary}: ${String(e)}`,
               cause: e,
             }),
         });
@@ -521,6 +493,7 @@ export const LspClientLive = (config: LspConfig = {}): Layer.Layer<LspClient> =>
               },
               rootUri,
               workspaceFolders: [{ uri: rootUri, name: "workspace" }],
+              ...plugin.initializeParams(rootDir),
             }),
           catch: (e) =>
             e instanceof LspTimeoutError
@@ -593,7 +566,7 @@ export const LspClientLive = (config: LspConfig = {}): Layer.Layer<LspClient> =>
                 transport.notify("textDocument/didOpen", {
                   textDocument: {
                     uri,
-                    languageId: lsConfig.languageId(filePath),
+                    languageId: plugin.languageId(filePath),
                     version: 1,
                     text: content,
                   },
@@ -629,7 +602,7 @@ export const LspClientLive = (config: LspConfig = {}): Layer.Layer<LspClient> =>
         const watcher = yield* Effect.try({
           try: () => {
             const w = watch(rootDir, { recursive: true }, (eventType, filename) => {
-              if (!filename || !shouldWatch(filename, lsConfig)) return;
+              if (!filename || !shouldWatch(filename, plugin)) return;
 
               const absPath = resolve(rootDir, filename);
               const uri = `file://${absPath}`;

@@ -44,7 +44,11 @@ src/
     Resolve.ts           — loadTsconfigPaths, resolveAlias, resolveSpecifier, bunResolve (tsconfig path resolution)
     ImportGraph.ts       — extractFileImports, buildImportGraph, transitiveImporters (oxc AST import graph)
     RustImports.ts       — extractRustFileImportsSync/Async, rustResolve (tree-sitter Rust use statement extraction + crate-relative path resolution)
-  Lsp.ts                 — LspClient service, JsonRpcTransport, LspClientLive layer, LanguageServerConfig (TS/Rust)
+  Plugin.ts              — AstPlugin, LspPlugin, PluginRegistry interfaces, makeRegistry, PluginUnavailableError
+  TsPlugin.ts            — TsAstPluginImpl, TsLspPluginImpl (oxc + typescript-language-server)
+  RustPlugin.ts          — makeRustAstPlugin, RustLspPluginImpl (tree-sitter + rust-analyzer)
+  PluginLayers.ts        — makeRegistryFromPlugins, LspRuntimes service, makeLspRuntimes
+  Lsp.ts                 — LspClient service, JsonRpcTransport, LspClientLive layer
   Symbols.ts             — SymbolIndex service, toZoomSymbol, zoomDirectory, impact, deps, references, rename, definition, typeDefinition, implementation, codeActions, expandMacro, inlayHints
   Cochange.ts            — CochangeDb service, SQL query, graceful degradation
   Find.ts                — findSymbols: workspace-wide symbol search via oxc-parser (TS) / tree-sitter (Rust)
@@ -64,13 +68,13 @@ The `pure/` boundary is the testing contract: pure modules get coverage threshol
 
 ### LspClient (`src/Lsp.ts`)
 
-Manages a persistent language server process over JSON-RPC/stdio. Parameterized via `LanguageServerConfig` — two built-in configs: `tsLanguageServer` (typescript-language-server) and `rustLanguageServer` (rust-analyzer).
+Manages a persistent language server process over JSON-RPC/stdio. Parameterized via `LspPlugin` — two built-in plugins: `TsLspPluginImpl` (typescript-language-server) and `RustLspPluginImpl` (rust-analyzer).
 
 **Lifecycle:** `Layer.scoped` + `Scope.addFinalizer`. Spawns the LS on first use, kills on scope disposal. The scope is tied to the `ManagedRuntime` — which lives for the entire MCP server process.
 
 **JSON-RPC transport:** `JsonRpcTransport` class handles Content-Length framing with a `Uint8Array` byte buffer (not string — Content-Length counts bytes, not characters). Request/response correlation via incrementing integer IDs. Pending requests stored in a `Map<number, { resolve, reject }>`.
 
-**Binary resolution:** `node_modules/.bin/<binary>` first, `Bun.which()` fallback. Binary name comes from `LanguageServerConfig`.
+**Binary resolution:** `node_modules/.bin/<binary>` first, `Bun.which()` fallback. Binary name comes from `LspPlugin`.
 
 **Methods:**
 - `documentSymbol(uri)` — hierarchical symbol tree for a file
@@ -89,7 +93,7 @@ Manages a persistent language server process over JSON-RPC/stdio. Parameterized 
 - `inlayHints(uri, range)` — inferred type annotations and parameter names for a range
 - `shutdown()` — explicit early termination (sets flag to prevent duplicate cleanup in finalizer)
 
-**File watching:** A recursive `fs.watch` on the workspace root monitors extensions and filenames from `LanguageServerConfig` (e.g. `*.ts`/`*.tsx`/`tsconfig.json` for TS, `*.rs`/`Cargo.toml` for Rust). On change, sends `workspace/didChangeWatchedFiles` to the LS. Watcher errors (e.g. EMFILE) are silently ignored — stale state is an acceptable fallback.
+**File watching:** A recursive `fs.watch` on the workspace root monitors extensions and filenames from `LspPlugin` (e.g. `*.ts`/`*.tsx`/`tsconfig.json` for TS, `*.rs`/`Cargo.toml` for Rust). On change, sends `workspace/didChangeWatchedFiles` to the LS. Watcher errors (e.g. EMFILE) are silently ignored — stale state is an acceptable fallback.
 
 ### SymbolIndex (`src/Symbols.ts`)
 

@@ -69,7 +69,7 @@ audit:
 
 cli:
   path: ./packages/varp/src/cli
-  deps: [core]
+  deps: [shared, manifest, plan, scheduler, enforcement, analysis, execution, mcp]
   stability: experimental
 
 kart:
@@ -77,3 +77,13 @@ kart:
   stability: experimental
   doc: packages/kart/design.md
   tags: [code-intelligence]
+
+kiste:
+  paths: [packages/kiste/src]
+  stability: experimental
+  tags: [code-intelligence]
+
+havn:
+  paths: [packages/havn]
+  stability: experimental
+  tags: [plugin]
