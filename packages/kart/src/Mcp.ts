@@ -49,7 +49,8 @@ import {
   type ImportsArgs,
 } from "./Imports.js";
 import { listDirectory, type ListArgs } from "./List.js";
-import { LspClientLive, rustLanguageServer } from "./Lsp.js";
+import { LspClientLive } from "./Lsp.js";
+import { RustLspPluginImpl } from "./RustPlugin.js";
 import { initRustParser } from "./pure/RustSymbols.js";
 import type { DepsResult, ImpactResult } from "./pure/types.js";
 import { searchPattern, type SearchArgs } from "./Search.js";
@@ -201,7 +202,7 @@ function createServer(config: ServerConfig = {}): McpServer {
   const makeRustRuntime = () =>
     ManagedRuntime.make(
       SymbolIndexLive({ rootDir }).pipe(
-        Layer.provide(LspClientLive({ rootDir, languageServer: rustLanguageServer })),
+        Layer.provide(LspClientLive({ rootDir, plugin: RustLspPluginImpl })),
       ),
     );
   let rustRuntime: ReturnType<typeof makeRustRuntime> | null = null;

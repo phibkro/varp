@@ -12,6 +12,8 @@ const fakeAst: AstPlugin["Type"] = {
 
 const fakeLsp: LspPlugin["Type"] = {
   extensions: new Set([".ts", ".tsx"]),
+  binary: "fake-lsp",
+  args: [],
   languageId: (path) => (path.endsWith(".tsx") ? "typescriptreact" : "typescript"),
   initializeParams: () => ({}),
   watchExtensions: new Set([".ts", ".tsx"]),
