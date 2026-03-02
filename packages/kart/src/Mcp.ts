@@ -175,8 +175,23 @@ function compactDeps(result: DepsResult, rootDir: string) {
 
 // ── Plugin error helpers ──
 
-const isPluginUnavailable = (e: unknown): e is PluginUnavailableError =>
-  e instanceof Error && (e as Record<string, unknown>)._tag === "PluginUnavailableError";
+/** Extract the PluginUnavailableError from a possibly-wrapped error, or return undefined. */
+const getPluginUnavailableError = (e: unknown): PluginUnavailableError | undefined => {
+  if (!e || typeof e !== "object") return undefined;
+  // Direct check — TaggedError instances have _tag directly
+  if ((e as Record<string, unknown>)._tag === "PluginUnavailableError")
+    return e as PluginUnavailableError;
+  // FiberFailure: Effect runtime wraps errors in a FiberFailure with the cause at a symbol key
+  if (e instanceof Error) {
+    const cause = (e as unknown as Record<symbol, unknown>)[FiberFailureCauseSymbol] as
+      | { _tag?: string; error?: Record<string, unknown> }
+      | undefined;
+    if (cause?._tag === "Fail" && cause.error?.["_tag"] === "PluginUnavailableError") {
+      return cause.error as unknown as PluginUnavailableError;
+    }
+  }
+  return undefined;
+};
 
 function pluginUnavailableResponse(err: PluginUnavailableError) {
   const ext = extname(err.path);
@@ -228,8 +243,9 @@ function createServer(config: ServerConfig = {}): McpServer {
       // tree-sitter init failed — .rs files won't have AST support
     });
 
-  // LSP runtimes — lazily spawns per-language ManagedRuntimes
-  const lspRuntimes = makeLspRuntimes(registry, rootDir);
+  // LSP runtimes — lazily spawns per-language ManagedRuntimes.
+  // Pass a getter so async registry updates (Rust AST plugin) are reflected.
+  const lspRuntimes = makeLspRuntimes(() => registry, rootDir);
 
   // Note: Rust parser (tree-sitter) is initialized by makeRustAstPlugin() above.
   // kart_find fallback path also calls initRustParser() lazily if needed.
@@ -252,6 +268,51 @@ function createServer(config: ServerConfig = {}): McpServer {
   let symbolWatcher = startWatcher();
 
   const server = new McpServer({ name: "kart", version: "0.1.0" });
+
+  // ── LSP tool helper ──
+  // Encapsulates the repeated pattern: runtimeFor lookup → Effect run → response/error shaping.
+  // Tools with custom result formatting pass an optional transform function.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MCP SDK registerTool overloads are too narrow for generic wrappers
+  function registerLspTool<TArgs extends { path: string }>(
+    tool: {
+      name: string;
+      description: string;
+      inputSchema: any;
+      annotations: Record<string, unknown>;
+      handler: (args: TArgs) => Effect.Effect<unknown, unknown, unknown>;
+    },
+    options?: { transform?: (result: unknown, rootDir: string) => unknown },
+  ): void {
+    server.registerTool(
+      tool.name,
+      {
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
+      },
+      async (args: Record<string, unknown>) => {
+        try {
+          const typedArgs = args as TArgs;
+          const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
+          const raw = await runtime.runPromise(
+            tool.handler(typedArgs) as Effect.Effect<unknown, never, never>,
+          );
+          const result = options?.transform ? options.transform(raw, rootDir) : raw;
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+            structuredContent: result as Record<string, unknown>,
+          };
+        } catch (e) {
+          const unavailable = getPluginUnavailableError(e);
+          if (unavailable) return pluginUnavailableResponse(unavailable);
+          return {
+            isError: true,
+            content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
+          };
+        }
+      },
+    );
+  }
 
   // Register kart_cochange
   server.registerTool(
@@ -280,208 +341,27 @@ function createServer(config: ServerConfig = {}): McpServer {
   );
 
   // Register kart_zoom
-  server.registerTool(
-    kart_zoom.name,
-    {
-      description: kart_zoom.description,
-      inputSchema: kart_zoom.inputSchema,
-      annotations: kart_zoom.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; level?: number; resolveTypes?: boolean };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const result = await runtime.runPromise(
-          kart_zoom.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; level?: number; resolveTypes?: boolean }>(kart_zoom);
 
   // Register kart_impact
-  server.registerTool(
-    kart_impact.name,
-    {
-      description: kart_impact.description,
-      inputSchema: kart_impact.inputSchema,
-      annotations: kart_impact.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; symbol: string; depth?: number };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const raw = await runtime.runPromise(
-          kart_impact.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        const result = compactImpact(raw as ImpactResult, rootDir);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; symbol: string; depth?: number }>(kart_impact, {
+    transform: (raw, dir) => compactImpact(raw as ImpactResult, dir),
+  });
 
   // Register kart_references (LSP-backed)
-  server.registerTool(
-    kart_references.name,
-    {
-      description: kart_references.description,
-      inputSchema: kart_references.inputSchema,
-      annotations: kart_references.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; symbol: string; includeDeclaration?: boolean };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const result = await runtime.runPromise(
-          kart_references.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; symbol: string; includeDeclaration?: boolean }>(kart_references);
 
   // Register kart_definition (LSP-backed)
-  server.registerTool(
-    kart_definition.name,
-    {
-      description: kart_definition.description,
-      inputSchema: kart_definition.inputSchema,
-      annotations: kart_definition.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; symbol: string };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const result = await runtime.runPromise(
-          kart_definition.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; symbol: string }>(kart_definition);
 
   // Register kart_type_definition (LSP-backed)
-  server.registerTool(
-    kart_type_definition.name,
-    {
-      description: kart_type_definition.description,
-      inputSchema: kart_type_definition.inputSchema,
-      annotations: kart_type_definition.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; symbol: string };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const result = await runtime.runPromise(
-          kart_type_definition.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; symbol: string }>(kart_type_definition);
 
   // Register kart_implementation (LSP-backed)
-  server.registerTool(
-    kart_implementation.name,
-    {
-      description: kart_implementation.description,
-      inputSchema: kart_implementation.inputSchema,
-      annotations: kart_implementation.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; symbol: string };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const result = await runtime.runPromise(
-          kart_implementation.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; symbol: string }>(kart_implementation);
 
   // Register kart_code_actions (LSP-backed)
-  server.registerTool(
-    kart_code_actions.name,
-    {
-      description: kart_code_actions.description,
-      inputSchema: kart_code_actions.inputSchema,
-      annotations: kart_code_actions.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; symbol: string };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const result = await runtime.runPromise(
-          kart_code_actions.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; symbol: string }>(kart_code_actions);
 
   // Register kart_expand_macro (Rust only, LSP-backed)
   server.registerTool(
@@ -523,62 +403,10 @@ function createServer(config: ServerConfig = {}): McpServer {
   );
 
   // Register kart_inlay_hints (LSP-backed)
-  server.registerTool(
-    kart_inlay_hints.name,
-    {
-      description: kart_inlay_hints.description,
-      inputSchema: kart_inlay_hints.inputSchema,
-      annotations: kart_inlay_hints.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; startLine?: number; endLine?: number };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const result = await runtime.runPromise(
-          kart_inlay_hints.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; startLine?: number; endLine?: number }>(kart_inlay_hints);
 
   // Register kart_rename (LSP-backed, write)
-  server.registerTool(
-    kart_rename.name,
-    {
-      description: kart_rename.description,
-      inputSchema: kart_rename.inputSchema,
-      annotations: kart_rename.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; symbol: string; newName: string };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const result = await runtime.runPromise(
-          kart_rename.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; symbol: string; newName: string }>(kart_rename);
 
   // Register kart_find (stateless — no Effect runtime needed)
   server.registerTool(
@@ -630,34 +458,9 @@ function createServer(config: ServerConfig = {}): McpServer {
   );
 
   // Register kart_deps
-  server.registerTool(
-    kart_deps.name,
-    {
-      description: kart_deps.description,
-      inputSchema: kart_deps.inputSchema,
-      annotations: kart_deps.annotations,
-    },
-    async (args) => {
-      try {
-        const typedArgs = args as { path: string; symbol: string; depth?: number };
-        const runtime = await Effect.runPromise(lspRuntimes.runtimeFor(typedArgs.path));
-        const raw = await runtime.runPromise(
-          kart_deps.handler(typedArgs) as Effect.Effect<unknown>,
-        );
-        const result = compactDeps(raw as DepsResult, rootDir);
-        return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as Record<string, unknown>,
-        };
-      } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
-        return {
-          content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
+  registerLspTool<{ path: string; symbol: string; depth?: number }>(kart_deps, {
+    transform: (raw, dir) => compactDeps(raw as DepsResult, dir),
+  });
 
   // Register kart_list (stateless — no Effect runtime needed)
   server.registerTool(
@@ -928,7 +731,8 @@ function createServer(config: ServerConfig = {}): McpServer {
           structuredContent: result as Record<string, unknown>,
         };
       } catch (e) {
-        if (isPluginUnavailable(e)) return pluginUnavailableResponse(e);
+        const unavailable = getPluginUnavailableError(e);
+        if (unavailable) return pluginUnavailableResponse(unavailable);
         return {
           content: [{ type: "text" as const, text: `Error: ${errorMessage(e)}` }],
           isError: true,

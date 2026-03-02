@@ -189,7 +189,7 @@ c:
   path: ./c
   deps: [backend]
 `);
-    expect(m.components.c.deps!.sort()).toEqual(["a", "b"]);
+    expect([...m.components.c.deps!].sort()).toEqual(["a", "b"]);
   });
 
   test("component name dep is unchanged", () => {
@@ -217,7 +217,7 @@ d:
   path: ./d
   deps: [c, lib]
 `);
-    expect(m.components.d.deps!.sort()).toEqual(["a", "b", "c"]);
+    expect([...m.components.d.deps!].sort()).toEqual(["a", "b", "c"]);
   });
 
   test("self-exclusion: tagged component depending on own tag", () => {
@@ -275,6 +275,6 @@ c:
     // "a" is listed explicitly AND via tag "lib" — should appear once
     const deps = m.components.c.deps!;
     expect(deps.filter((d) => d === "a")).toHaveLength(1);
-    expect(deps.sort()).toEqual(["a", "b"]);
+    expect([...deps].sort()).toEqual(["a", "b"]);
   });
 });

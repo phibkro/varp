@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import * as SqlClient from "@effect/sql/SqlClient";
@@ -107,9 +107,9 @@ export const createSnapshot = (
 
     // Count artifacts
     const sql = yield* SqlClient.SqlClient;
-    const rows = (yield* sql.unsafe(
-      `SELECT COUNT(*) as count FROM artifacts WHERE alive = 1`,
-    )) as unknown as { count: number }[];
+    const rows = yield* sql
+      .unsafe<{ count: number }>(`SELECT COUNT(*) as count FROM artifacts WHERE alive = 1`)
+      .pipe(Effect.catchAll((e) => Effect.fail(new DbError({ message: e.message, cause: e }))));
 
     return {
       sha: lastSha,
@@ -136,8 +136,9 @@ export const restoreSnapshot = (
     }
     const files = readdirSync(snapshotsDir)
       .filter((f) => f.endsWith(".sqlite"))
-      .sort()
-      .reverse();
+      .map((f) => ({ f, mtimeMs: statSync(resolve(snapshotsDir, f)).mtimeMs }))
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+      .map((e) => e.f);
     if (files.length === 0) {
       return yield* Effect.fail(new IndexError({ message: "No snapshots found" }));
     }
@@ -189,18 +190,20 @@ const maybeAutoSnapshot = (
     // Count commits since last snapshot
     let commitsSinceSnapshot: number;
     if (!lastSnapshotSha) {
-      const rows = (yield* sql.unsafe(`SELECT COUNT(*) as count FROM commits`)) as unknown as {
-        count: number;
-      }[];
+      const rows = yield* sql
+        .unsafe<{ count: number }>(`SELECT COUNT(*) as count FROM commits`)
+        .pipe(Effect.catchAll((e) => Effect.fail(new DbError({ message: e.message, cause: e }))));
       commitsSinceSnapshot = rows[0].count;
     } else {
       // Count commits after the snapshot sha by timestamp
-      const rows = (yield* sql.unsafe(
-        `SELECT COUNT(*) as count FROM commits WHERE timestamp > (
-          SELECT timestamp FROM commits WHERE sha = ?
-        )`,
-        [lastSnapshotSha],
-      )) as unknown as { count: number }[];
+      const rows = yield* sql
+        .unsafe<{ count: number }>(
+          `SELECT COUNT(*) as count FROM commits WHERE timestamp > (
+            SELECT timestamp FROM commits WHERE sha = ?
+          )`,
+          [lastSnapshotSha],
+        )
+        .pipe(Effect.catchAll((e) => Effect.fail(new DbError({ message: e.message, cause: e }))));
       commitsSinceSnapshot = rows[0].count;
     }
 
@@ -223,22 +226,30 @@ const processCommits = (
 
     // Wrap all commits in a single transaction for performance.
     // Without this, each INSERT/UPDATE is an implicit transaction (extremely slow for large repos).
-    yield* sql
-      .unsafe("BEGIN")
-      .pipe(Effect.catchAll((e) => Effect.fail(new DbError({ message: e.message, cause: e }))));
-    try {
+    const body = Effect.gen(function* () {
       for (const commit of commits) {
         const counts = yield* indexCommit(commit);
         artifacts_indexed += counts.indexed;
         artifacts_deleted += counts.deleted;
       }
-      yield* sql
-        .unsafe("COMMIT")
-        .pipe(Effect.catchAll((e) => Effect.fail(new DbError({ message: e.message, cause: e }))));
-    } catch (e) {
-      yield* sql.unsafe("ROLLBACK").pipe(Effect.catchAll(() => Effect.void));
-      throw e;
-    }
+    });
+
+    yield* sql
+      .unsafe("BEGIN")
+      .pipe(Effect.catchAll((e) => Effect.fail(new DbError({ message: e.message, cause: e }))));
+    yield* body.pipe(
+      Effect.tap(() =>
+        sql
+          .unsafe("COMMIT")
+          .pipe(Effect.catchAll((e) => Effect.fail(new DbError({ message: e.message, cause: e })))),
+      ),
+      Effect.catchAll((e) =>
+        sql.unsafe("ROLLBACK").pipe(
+          Effect.catchAll(() => Effect.void),
+          Effect.andThen(Effect.fail(e)),
+        ),
+      ),
+    );
 
     return {
       commits_indexed: commits.length,

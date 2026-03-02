@@ -80,7 +80,7 @@ varp is not required. it's an enhancement to the signal, not a prerequisite.
 
 ## 3. architecture
 
-kiste is a CQRS system at local scale: git is the write log and source of truth, sqlite is the derived read model, and an MCP server exposes a read-only query interface to agents.
+kiste is a CQRS system at local scale: git is the write log and source of truth, sqlite is the derived read model, and an MCP server exposes a query interface to agents (6 read-only tools + 1 write tool for tagging).
 
 ```
   git history
@@ -92,7 +92,7 @@ kiste is a CQRS system at local scale: git is the write log and source of truth,
   sqlite (derived read model)
       │ metadata + tags + FTS index (no file content)
       ▼
-  MCP server (read-only)
+  MCP server (6 read + 1 write)
       │
       ▼
   agents
@@ -186,7 +186,7 @@ the indexer is stateless between runs. no daemon required beyond a git hook or l
 
 ### 3.4 MCP server
 
-a read-only, stateless MCP server. tools operate over sqlite for metadata and git for content. progressive disclosure: list operations return lightweight summaries, get operations return full content on demand.
+a mostly read-only, stateless MCP server. tools operate over sqlite for metadata and git for content. one write tool (`kiste_tag`) allows agents to add/remove tags on artifacts. progressive disclosure: list operations return lightweight summaries, get operations return full content on demand.
 
 **tools:**
 
@@ -207,6 +207,9 @@ all tags in the index with artifact counts. useful for exploration.
 
 `get_cochange(path, limit?)` → `{path, cochanges: [{path, count, jaccard}], total_commits}`
 given an artifact, find other artifacts that frequently change in the same commits. returns co-change pairs ranked by frequency with jaccard similarity scores. this is behavioral coupling — the most valuable cross-component signal for agents.
+
+`tag(path, tags, op?)` → `{path, tags}`
+add or remove tags on an artifact manually. lets agents supplement auto-derived tags without committing. only write-capable tool.
 
 two-tier retrieval: structured tag queries for known intent, full-text search as fallback for exploration. agents use tags most of the time; full-text search handles "i know what i'm looking for but not what it's called."
 
@@ -322,7 +325,7 @@ all fields are optional with sensible defaults. missing config file = all defaul
 - **embeddings** — deferred to phase 4, conditional on demonstrated need. FTS5 + tags first.
 - **snapshot frequency** — configurable, default 500 commits. auto-trigger + on-demand via CLI.
 - **MCP pagination** — offset-based for `list_artifacts` (phase 0). cursor-based if needed later.
-- **rebuild_index** — CLI only. MCP surface stays minimal and read-only.
+- **rebuild_index** — CLI only. MCP surface stays minimal (reads + tagging).
 - **deletion tracking** — `alive` flag on artifacts, filtered by default.
 - **indexing trigger** — post-commit hook for interactive use (immediate, zero polling). CI pipelines run `kiste index` as a build step. no daemon.
 - **index scope** — one index per repo root, not per component or workspace. cross-component co-change is the most valuable signal and would be lost by splitting.

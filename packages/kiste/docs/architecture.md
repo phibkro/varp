@@ -1,6 +1,6 @@
 # Kiste Architecture
 
-Git-backed artifact index. Git is the event store, SQLite is the derived read model, MCP exposes read-only queries. For design rationale, problem statement, and roadmap, see [design.md](design.md).
+Git-backed artifact index. Git is the event store, SQLite is the derived read model, MCP exposes queries and lightweight write operations (tagging). For design rationale, problem statement, and roadmap, see [design.md](design.md).
 
 ## System Overview
 
@@ -79,7 +79,7 @@ artifacts ──< artifact_commits >── commits
 | Entry | File | Build output | Purpose |
 |---|---|---|---|
 | CLI | `src/Cli.ts` | `dist/Cli.js` | `kiste init\|index\|status\|query\|snapshot` |
-| MCP | `src/Mcp.ts` | `dist/Mcp.js` | 6 read-only MCP tools over stdio |
+| MCP | `src/Mcp.ts` | `dist/Mcp.js` | 7 MCP tools over stdio (6 read-only + 1 write) |
 
 Both built with `bun build --target bun`. CLI uses `@effect/cli` with `BunRuntime.runMain`. MCP uses `@modelcontextprotocol/sdk` with `StdioServerTransport`.
 
