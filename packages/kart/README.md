@@ -63,7 +63,7 @@ Or install via the vevx marketplace:
 | `kart_insert_after` | Insert content after a symbol's definition (TS + Rust). Optional `format` param. |
 | `kart_insert_before` | Insert content before a symbol's definition (TS + Rust). Optional `format` param. |
 | `kart_rename` | Reference-aware rename across workspace via LSP |
-| `kart_restart` | Restart the TypeScript language server (clears caches) |
+| `kart_restart` | Restart all language server runtimes (clears caches) |
 
 ### kart_zoom
 
@@ -101,7 +101,7 @@ Computes the blast radius of changing a symbol. BFS over LSP `incomingCalls` to 
 | `symbol` | required | Name of the symbol to analyze |
 | `depth` | 3 | BFS depth limit (1–5). Higher depths may be slow on large codebases. |
 
-Returns a tree of callers with metadata: `totalNodes`, `highFanOut` (warns when any node exceeds 10 callers), `depth`, `maxDepth`. Uses `zoomRuntime` (shares LSP with `kart_zoom`).
+Returns a tree of callers with metadata: `totalNodes`, `highFanOut` (warns when any node exceeds 10 callers), `depth`, `maxDepth`. Uses per-language `LspRuntimes` (lazy, routed by file extension via `PluginRegistry`).
 
 ### kart_deps
 
@@ -287,7 +287,11 @@ LSP `workspace/symbol` search — returns symbols matching the query across the 
 | AstEdit | `src/pure/AstEdit.ts` | Symbol location, syntax validation, byte-range splicing (TS + Rust dispatch) |
 | Resolve | `src/pure/Resolve.ts` | tsconfig path alias resolution (`loadTsconfigPaths`, `resolveAlias`, `resolveSpecifier`, `bunResolve`) |
 | ImportGraph | `src/pure/ImportGraph.ts` | oxc-based import extraction, import graph construction, barrel-aware transitive importers |
-| LspClient | `src/Lsp.ts` | Language server over stdio (JSON-RPC, Effect Layer, file watcher). Parameterized for TS and Rust. |
+| Plugin | `src/Plugin.ts` | `AstPlugin`, `LspPlugin`, `PluginRegistry` interfaces, `makeRegistry`, `PluginUnavailableError` |
+| TsPlugin | `src/TsPlugin.ts` | TypeScript plugins — `TsAstPluginImpl` (oxc), `TsLspPluginImpl` (typescript-language-server) |
+| RustPlugin | `src/RustPlugin.ts` | Rust plugins — `makeRustAstPlugin` (tree-sitter), `RustLspPluginImpl` (rust-analyzer) |
+| PluginLayers | `src/PluginLayers.ts` | `makeRegistryFromPlugins`, `LspRuntimes` service, `makeLspRuntimes` |
+| LspClient | `src/Lsp.ts` | Language server over stdio (JSON-RPC, Effect Layer, file watcher). Parameterized via `LspPlugin`. |
 | SymbolIndex | `src/Symbols.ts` | Zoom + impact + deps + references + rename — workspace-scoped, combines LSP + pure functions |
 | CochangeDb | `src/Cochange.ts` | SQLite reader for co-change data (cached connections) |
 | Find | `src/Find.ts` | Workspace-wide symbol search via oxc-parser (TS) / tree-sitter (Rust), mtime-cached |
@@ -296,8 +300,8 @@ LSP `workspace/symbol` search — returns symbols matching the query across the 
 | Editor | `src/Editor.ts` | AST-aware edit pipeline (locate → validate → splice → write → format → lint, TS + Rust) |
 | Diagnostics | `src/Diagnostics.ts` | oxlint (TS) + cargo clippy (Rust) with graceful degradation |
 | Imports | `src/Imports.ts` | Import graph queries — `getImports`, `getImporters` with barrel expansion |
-| Tools | `src/Tools.ts` | 23 MCP tool definitions (Zod schemas + Effect/async handlers) |
-| Mcp | `src/Mcp.ts` | Server entrypoint, per-tool ManagedRuntime |
+| Tools | `src/Tools.ts` | 24 MCP tool definitions (Zod schemas + Effect/async handlers) |
+| Mcp | `src/Mcp.ts` | Server entrypoint, `PluginRegistry` + `LspRuntimes` wiring |
 
 `src/pure/` contains deterministic modules with no IO — 100% function coverage, 99% line coverage enforced. Effectful modules (`Lsp.ts`, `Symbols.ts`, `Cochange.ts`) have integration tests without coverage gates. Stateless modules (`Search.ts`, `List.ts`, `Editor.ts`, `Diagnostics.ts`, `Imports.ts`) and cached modules (`Find.ts` — mtime-based symbol cache) are tested without Effect runtime.
 
