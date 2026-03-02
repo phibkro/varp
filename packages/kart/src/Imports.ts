@@ -93,7 +93,9 @@ function makeResolver(rootDir: string): (specifier: string, fromDir: string) => 
   };
 }
 
-/** Dispatch extraction to the correct parser based on file extension. */
+/** Dispatch extraction to the correct parser based on file extension.
+ *  Convention: bulk scans silently skip unsupported extensions (extractFileImports
+ *  returns empty imports for non-TS/TSX). Targeted tools throw PluginUnavailableError. */
 function makeExtractor(): (
   source: string,
   filename: string,

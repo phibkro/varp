@@ -261,6 +261,12 @@ Three handler patterns:
 
 Tool annotations: `READ_ONLY` for navigation tools, `READ_WRITE` for edit tools (`kart_replace`, `kart_insert_after`, `kart_insert_before`, `kart_rename`).
 
+### extension handling convention
+
+Bulk-scan tools (`kart_find`, `kart_list`, `kart_search`, `kart_imports`) silently skip files with unsupported extensions — they return empty results. This matches how grep/ripgrep handle binary files: no error, just no results.
+
+Targeted tools (`kart_zoom`, `kart_definition`, `kart_rename`) throw `PluginUnavailableError` when the file extension has no registered plugin. The caller asked for a specific file — silence would be confusing.
+
 ## error model
 
 | error | type | when |

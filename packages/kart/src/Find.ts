@@ -145,6 +145,8 @@ async function parseFile(
   if (path.endsWith(".ts") || path.endsWith(".tsx")) {
     return parseSymbols(source, path);
   }
+  // Convention: bulk scans silently skip unsupported extensions (return []).
+  // Targeted tools (zoom, definition, rename) throw PluginUnavailableError instead.
   return [];
 }
 
