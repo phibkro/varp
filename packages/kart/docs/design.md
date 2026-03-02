@@ -49,38 +49,39 @@ Kart uses three backends depending on what's needed:
 
 **tree-sitter** — for Rust symbol extraction. WASM-based (`web-tree-sitter`), no native bindings. Parses `function_item`, `struct_item`, `enum_item`, `trait_item`, `impl_item`, `type_item`, `const_item`, `static_item`, `mod_item`, `macro_definition`. Returns the same `OxcSymbol` shape for compatibility.
 
-**LSP** — for cross-file type resolution. `typescript-language-server` for TS, `rust-analyzer` for Rust. Parameterized via `LanguageServerConfig` (binary, args, languageId, watch patterns). LSP-backed tools route by file extension.
+**LSP** — for cross-file type resolution. `typescript-language-server` for TS, `rust-analyzer` for Rust. Parameterized via `LspPlugin` (binary, args, languageId, watch patterns). LSP-backed tools route by file extension through `PluginRegistry`.
 
 The split is clean: if a tool needs to cross file boundaries for type information, use LSP. For per-file parsing, use oxc (TS) or tree-sitter (Rust).
 
 ### 3.2 runtime architecture
 
-Kart uses **per-tool runtimes** rather than a single shared runtime. Each MCP tool gets its own Effect `ManagedRuntime` with only the services it needs:
+Kart uses **per-language runtimes** managed by `LspRuntimes`. Each file extension maps to one `LspPlugin`, one `ManagedRuntime`:
 
 ```
 McpServer
   ├─ cochangeRuntime → CochangeDb (bun:sqlite, read-only)
-  ├─ zoomRuntime     → SymbolIndex → LspClient (typescript-language-server)
-  └─ rustRuntime     → SymbolIndex → LspClient (rust-analyzer)  [lazy]
+  └─ lspRuntimes     → per-extension ManagedRuntime (lazy)
+       ├─ .ts/.tsx   → SymbolIndex → LspClient (typescript-language-server)
+       └─ .rs        → SymbolIndex → LspClient (rust-analyzer)
 ```
 
-This means `kart_cochange` works even when a language server fails to start. `rustRuntime` is created lazily on first `.rs` tool call — if `rust-analyzer` isn't installed, TS tools still work. See ADR-004.
+`PluginRegistry` routes tool calls to the correct `AstPlugin` or `LspPlugin` by file extension. Runtimes are created lazily on first use — if `rust-analyzer` isn't installed, TS tools still work. Unsupported extensions return a structured `PluginUnavailableError` instead of crashing. See ADR-004, ADR-007.
 
 ### 3.3 language server connection
 
-Kart manages persistent language server processes per workspace, parameterized via `LanguageServerConfig`:
+Kart manages persistent language server processes per workspace, parameterized via `LspPlugin`:
 
 - **init**: on first call needing LSP, spawn the configured binary, perform the handshake, cache the connection
 - **warm**: subsequent calls reuse the connection — no per-query startup cost
 - **release**: close open documents, send `shutdown` request → `exit` notification, kill process
 
-Two built-in configs: `tsLanguageServer` (typescript-language-server --stdio) and `rustLanguageServer` (rust-analyzer). Each config specifies binary, args, languageId mapping, and file watch patterns.
+Two built-in plugins: `TsLspPluginImpl` (typescript-language-server --stdio) and `RustLspPluginImpl` (rust-analyzer). Each specifies binary, args, languageId mapping, and file watch patterns.
 
 **Binary resolution:** `node_modules/.bin/<binary>` first, `Bun.which()` fallback.
 
 **JSON-RPC transport:** `JsonRpcTransport` handles Content-Length framing with a `Uint8Array` byte buffer (Content-Length counts bytes, not characters). Request/response correlation via incrementing integer IDs.
 
-**File watching:** A recursive `fs.watch` monitors extensions and filenames from the config (e.g. `*.ts`/`tsconfig.json` for TS, `*.rs`/`Cargo.toml` for Rust). Watcher errors silently ignored — stale state is an acceptable fallback.
+**File watching:** A recursive `fs.watch` monitors extensions and filenames from the plugin config (e.g. `*.ts`/`tsconfig.json` for TS, `*.rs`/`Cargo.toml` for Rust). Watcher errors silently ignored — stale state is an acceptable fallback.
 
 ### 3.4 zoom levels
 

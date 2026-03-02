@@ -296,37 +296,6 @@ class JsonRpcTransport {
   }
 }
 
-// ── Language server configuration ──
-
-export type LanguageServerConfig = {
-  /** Binary name to find/spawn. */
-  readonly binary: string;
-  /** CLI args (e.g. ["--stdio"]). */
-  readonly args: readonly string[];
-  /** Map file path → LSP languageId. */
-  readonly languageId: (path: string) => string;
-  /** File extensions to watch for changes. */
-  readonly watchExtensions: ReadonlySet<string>;
-  /** Specific filenames to watch (e.g. tsconfig.json). */
-  readonly watchFilenames: ReadonlySet<string>;
-};
-
-export const tsLanguageServer: LanguageServerConfig = {
-  binary: "typescript-language-server",
-  args: ["--stdio"],
-  languageId: (path) => (path.endsWith(".tsx") ? "typescriptreact" : "typescript"),
-  watchExtensions: new Set([".ts", ".tsx"]),
-  watchFilenames: new Set(["tsconfig.json", "package.json"]),
-};
-
-export const rustLanguageServer: LanguageServerConfig = {
-  binary: "rust-analyzer",
-  args: [],
-  languageId: () => "rust",
-  watchExtensions: new Set([".rs"]),
-  watchFilenames: new Set(["Cargo.toml", "Cargo.lock"]),
-};
-
 // ── Binary resolution ──
 
 function findLspBinary(rootDir: string, binaryName: string): string {
