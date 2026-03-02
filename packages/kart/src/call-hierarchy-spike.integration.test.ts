@@ -9,8 +9,8 @@ import { resolve } from "node:path";
 
 import { Effect, ManagedRuntime } from "effect";
 
-import { LspClient, LspClientLive } from "./Lsp.js";
 import type { CallHierarchyItem } from "./core/types.js";
+import { LspClient, LspClientLive } from "./Lsp.js";
 
 const hasLsp = Bun.which("typescript-language-server") !== null && !process.env.TURBO_HASH;
 

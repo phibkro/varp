@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 
 import { Context, Effect, Layer } from "effect";
 
-import { LspClient } from "./Lsp.js";
 import { FileNotFoundError, LspError, LspTimeoutError } from "./core/Errors.js";
 import { isExported } from "./core/ExportDetection.js";
 import { parseSymbols } from "./core/OxcSymbols.js";
@@ -27,6 +26,7 @@ import type {
   WorkspaceSymbolResult,
 } from "./core/types.js";
 import type { ZoomResult, ZoomSymbol } from "./core/types.js";
+import { LspClient } from "./Lsp.js";
 
 export type {
   CodeActionsResult,

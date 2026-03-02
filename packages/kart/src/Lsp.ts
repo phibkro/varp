@@ -3,8 +3,8 @@ import { basename, resolve } from "node:path";
 
 import { Context, Effect, Layer, Scope } from "effect";
 
-import type { LspPlugin } from "./Plugin.js";
 import { LspError, LspTimeoutError } from "./core/Errors.js";
+import type { LspPlugin } from "./Plugin.js";
 import { TsLspPluginImpl } from "./TsPlugin.js";
 
 export type {

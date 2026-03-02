@@ -11,7 +11,6 @@ import { resolve } from "node:path";
 
 import { Option } from "effect";
 
-import type { AstPlugin } from "./Plugin.js";
 import {
   locateSymbol,
   spliceInsertAfter,
@@ -20,6 +19,7 @@ import {
   validateSyntax,
 } from "./core/AstEdit.js";
 import type { Diagnostic } from "./core/types.js";
+import type { AstPlugin } from "./Plugin.js";
 
 // ── Types ──
 

@@ -1,9 +1,9 @@
 import { Option } from "effect";
 
-import type { AstPlugin, LspPlugin } from "./Plugin.js";
 import type { SymbolRange } from "./core/AstEdit.js";
 import { validateSyntax as validateTsSyntax } from "./core/AstEdit.js";
 import { parseSymbols } from "./core/OxcSymbols.js";
+import type { AstPlugin, LspPlugin } from "./Plugin.js";
 
 // ── TypeScript AST Plugin ──
 
