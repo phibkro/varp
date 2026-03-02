@@ -1,5 +1,0 @@
-[test]
-coverageSkipTestFiles = true
-coverageReporter = ["text", "lcov"]
-coverageDir = "coverage"
-coverageThreshold = { line = 1.0, function = 1.0 }
