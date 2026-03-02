@@ -7,6 +7,16 @@ import { ComponentSchema, componentPaths, type Manifest } from "#shared/types.js
 
 const manifestCache = new Map<string, { mtimeMs: number; manifest: Manifest }>();
 
+function deepFreeze<T>(obj: T): Readonly<T> {
+  Object.freeze(obj);
+  for (const value of Object.values(obj as Record<string, unknown>)) {
+    if (value && typeof value === "object" && !Object.isFrozen(value)) {
+      deepFreeze(value);
+    }
+  }
+  return obj;
+}
+
 /**
  * Parse a varp.yaml manifest file. Flat YAML format: `varp` key holds version,
  * all other top-level keys are component names. Resolves relative paths to
@@ -103,6 +113,6 @@ export function parseManifest(manifestPath: string): Manifest {
   resolveDeps(components);
 
   const manifest: Manifest = { varp, components };
-  manifestCache.set(absolutePath, { mtimeMs: fileStat.mtimeMs, manifest });
+  manifestCache.set(absolutePath, { mtimeMs: fileStat.mtimeMs, manifest: deepFreeze(manifest) });
   return manifest;
 }
