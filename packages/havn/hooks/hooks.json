@@ -1,5 +1,5 @@
 {
-  "description": "Havn plugin hooks — git hook install on session start, plugin sync on session end",
+  "description": "Havn plugin hooks — git hooks, plugin sync, memory lifecycle",
   "hooks": {
     "SessionStart": [
       {
@@ -19,6 +19,17 @@
             "type": "command",
             "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/sync-plugins.sh",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Extract insights from this conversation worth persisting to MEMORY.md. An insight qualifies only if ALL four gates pass:\n\n1. **Confirmed** — actually verified this session, not speculative\n2. **Not in MEMORY.md** — check the MEMORY.md content visible in this context\n3. **Not in CLAUDE.md** — check the CLAUDE.md content visible in this context\n4. **Behavioral** — would change how a future agent acts in this codebase\n\nFor each qualifying insight, output:\n- **Section**: one of Gotchas, Conventions, Decisions, Procedures, User Preferences\n- **Text**: the exact line to add, matching the terse style of existing entries\n\nIf nothing qualifies, say so in one line. Do not call any tools — your text output is the deliverable.",
+            "timeout": 30
           }
         ]
       }

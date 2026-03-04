@@ -4,10 +4,11 @@ Default Claude Code plugin setup. A stable harbor for AI agents setting sail on 
 
 ## What it provides
 
-- **Builder agent** -- domain-agnostic implementation agent with project-level memory
-- **Reviewer agent** -- structured review agent with PASS/FAIL verdicts and project memory
+- **Agents** -- builder (implementation + RGR TDD), reviewer (PASS/FAIL verdicts), context-expert (CLAUDE.md/MEMORY.md compression)
+- **Skills** -- development procedures (implement-feature, fix-bug, refactor, add-test-coverage), orchestration (execute-plan, evaluate-optimize-loop, verify-suite), authoring (prompt-writing, explore-codebase, skill-eval)
 - **Git hook management** -- SessionStart hook auto-installs a pre-commit hook (format, lint, build, test, changeset verification)
 - **Plugin auto-detection** -- SessionEnd hook enables Claude Code plugins based on project dependencies (Effect TS, React/Next.js, plugin-dev)
+- **Memory extraction** -- PreCompact hook extracts session insights to MEMORY.md before context compression
 
 Standalone -- no dependencies on other vevx packages.
 
@@ -30,12 +31,41 @@ All fields are optional. Without overrides, the hook auto-detects your runner (t
 
 ## Plugin assets
 
-| Path | Type | Purpose |
-|------|------|---------|
-| `agents/builder.md` | Agent | Implementation agent with project memory |
-| `agents/reviewer.md` | Agent | Review agent with structured PASS/FAIL output |
-| `hooks/install-hooks.sh` | SessionStart hook | Installs pre-commit hook, sets `core.hooksPath` |
-| `hooks/sync-plugins.sh` | SessionEnd hook | Detects deps, enables matching plugins in `settings.local.json` |
+### Agents
+
+| Agent | Purpose | Memory | Skills |
+|-------|---------|--------|--------|
+| `builder` | Implementation with RGR TDD | project | implement-feature, fix-bug, refactor, add-test-coverage, verify-suite |
+| `reviewer` | Structured PASS/FAIL review | project | implement-feature, fix-bug, refactor, add-test-coverage, prompt-writing, superpowers:writing-skills |
+| `context-expert` | CLAUDE.md/MEMORY.md compression | -- | -- |
+
+### Skills
+
+| Skill | Category | Purpose |
+|-------|----------|---------|
+| `implement-feature` | Procedure | RGR TDD: discover context, red, green, refactor |
+| `fix-bug` | Procedure | Reproduce, regression test, minimal fix, verify |
+| `refactor` | Procedure | Behavior-locked restructuring with baseline verification |
+| `add-test-coverage` | Procedure | Contract-first test backfilling |
+| `execute-plan` | Orchestration | Sequential task execution with builder + evaluate-optimize-loop |
+| `evaluate-optimize-loop` | Orchestration | Builder/reviewer iteration until PASS (max 3 rounds) |
+| `verify-suite` | Orchestration | Mechanical test/lint/analysis runner |
+| `explore-codebase` | Authoring | Parallel Explore subagents, synthesized overview |
+| `prompt-writing` | Authoring | Guidelines for writing agent-controlling text |
+| `skill-eval` | Authoring | Dry-run skill with unbiased agent |
+
+### Hooks
+
+| Path | Event | Purpose |
+|------|-------|---------|
+| `hooks/install-hooks.sh` | SessionStart | Installs pre-commit hook, sets `core.hooksPath` |
+| `hooks/sync-plugins.sh` | SessionEnd | Detects deps, enables matching plugins in `settings.local.json` |
+| `hooks/hooks.json:PreCompact` | PreCompact | Extracts session insights to MEMORY.md |
 | `hooks/pre-commit.sh` | Git hook | Format + lint + build (all branches), test + changeset (main only) |
-| `templates/agent.md` | Template | Agent frontmatter reference |
-| `templates/SKILL.md` | Template | Skill frontmatter reference |
+
+### Templates
+
+| Path | Purpose |
+|------|---------|
+| `templates/agent.md` | Agent frontmatter reference |
+| `templates/SKILL.md` | Skill frontmatter reference |

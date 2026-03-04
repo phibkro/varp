@@ -10,7 +10,7 @@ Agent toolkit for [Claude Code](https://claude.ai/claude-code). A monorepo of pl
 | [`@vevx/varp`](packages/varp/) | Dependency analysis and agent orchestration. Manifest-driven: structural grouping, doc freshness, coupling diagnostics, plan validation, task scheduling. | kiste |
 | [`@vevx/kart`](packages/kart/) | IDE interface for AI agents. Progressive code disclosure, LSP integration, AST-aware editing. 24 MCP tools. | — |
 | [`@vevx/audit`](packages/audit/) | Multi-agent compliance audit engine. Ruleset-based code review with 3-wave planner. | varp |
-| [`@vevx/havn`](packages/havn/) | Default Claude Code plugin setup. Builder/reviewer agents, project memory, git hooks, plugin auto-detection. | — |
+| [`@vevx/havn`](packages/havn/) | Default Claude Code plugin setup. 3 agents, 10 skills, project memory, git hooks, plugin auto-detection. | — |
 
 ```
 kiste ← varp ← audit

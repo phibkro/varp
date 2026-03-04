@@ -19,6 +19,12 @@
       "source": "./packages/kart/",
       "description": "Progressive code disclosure and behavioral coupling analysis via LSP and git history",
       "version": "0.1.0"
+    },
+    {
+      "name": "havn",
+      "source": "./packages/havn/",
+      "description": "Default Claude Code setup — memory lifecycle hooks, codebase exploration, builder/reviewer agents, and git hook automation",
+      "version": "0.1.0"
     }
   ]
 }
