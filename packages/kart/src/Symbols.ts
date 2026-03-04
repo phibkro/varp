@@ -893,6 +893,8 @@ function resolveSpecifierToSource(originPath: string, specifier: string): string
     return resolve(dir, specifier.replace(/\.js$/, ".tsx"));
   }
   if (specifier.endsWith(".jsx")) {
+    const tsPath = resolve(dir, specifier.replace(/\.jsx$/, ".ts"));
+    if (existsSync(tsPath)) return tsPath;
     return resolve(dir, specifier.replace(/\.jsx$/, ".tsx"));
   }
   // Extensionless — try .ts then .tsx
@@ -1093,6 +1095,7 @@ function filterDtsByKind(dts: string, kinds: string[]): string {
   const result: string[] = [];
   let inBlock = false;
   let braceDepth = 0;
+  let inStatement = false; // braceless multi-line declaration (e.g. function signature)
 
   for (const line of lines) {
     // Always keep import lines
@@ -1101,7 +1104,7 @@ function filterDtsByKind(dts: string, kinds: string[]): string {
       continue;
     }
 
-    // If we're tracking a matched block, keep lines until braces balance
+    // If we're tracking a matched brace block, keep lines until braces balance
     if (inBlock) {
       result.push(line);
       braceDepth += (line.match(/{/g) || []).length;
@@ -1113,13 +1116,25 @@ function filterDtsByKind(dts: string, kinds: string[]): string {
       continue;
     }
 
+    // If we're in a braceless multi-line statement, keep lines until `;`
+    if (inStatement) {
+      result.push(line);
+      if (line.includes(";")) {
+        inStatement = false;
+      }
+      continue;
+    }
+
     // Check if this line matches any of the requested kinds
     if (kindPatterns.some((p) => p.test(line))) {
       result.push(line);
-      // Track braces for multi-line declarations
+      // Track braces for multi-line declarations (class, interface, enum bodies)
       braceDepth = (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
       if (braceDepth > 0) {
         inBlock = true;
+      } else if (!line.includes(";")) {
+        // No braces and no semicolon — multi-line braceless declaration
+        inStatement = true;
       }
     }
   }

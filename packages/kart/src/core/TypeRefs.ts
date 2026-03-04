@@ -76,9 +76,9 @@ function parseTypeImports(dts: string): Map<string, string> {
     const source = m[2];
     for (const raw of names.split(",")) {
       const trimmed = raw.trim();
-      const typeMatch = /^type\s+(\w+)/.exec(trimmed);
+      const typeMatch = /^type\s+(\w+)(?:\s+as\s+(\w+))?/.exec(trimmed);
       if (typeMatch) {
-        result.set(typeMatch[1], source);
+        result.set(typeMatch[2] ?? typeMatch[1], source);
       }
     }
   }
