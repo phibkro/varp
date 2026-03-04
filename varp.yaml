@@ -61,7 +61,7 @@ hooks:
 
 audit:
   path: ./packages/audit/src
-  deps: [shared]
+  deps: [shared, execution, manifest]
   tags: [audit]
   stability: experimental
   docs:
