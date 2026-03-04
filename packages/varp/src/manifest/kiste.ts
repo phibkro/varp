@@ -1,6 +1,8 @@
 import { Database } from "bun:sqlite";
 import { existsSync } from "node:fs";
 
+import { CoChangeRow } from "@vevx/kiste/schema";
+
 import { findOwningComponent, buildComponentPaths } from "#shared/ownership.js";
 import type { Manifest, ImportDep } from "#shared/types.js";
 
@@ -66,11 +68,7 @@ export function readKisteCoChanges(
       const fromComponent = findOwningComponent(filePath, manifest, componentPaths);
       if (!fromComponent) continue;
 
-      const rows = stmt.all(filePath, limit) as {
-        path: string;
-        shared_count: number;
-        jaccard: number;
-      }[];
+      const rows = CoChangeRow.array().parse(stmt.all(filePath, limit));
 
       for (const row of rows) {
         if (row.jaccard < minJaccard) continue;

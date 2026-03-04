@@ -61,10 +61,11 @@
       "name": "@vevx/varp",
       "version": "0.1.1",
       "bin": {
-        "varp": "./dist/cli.js",
+        "varp": "dist/cli.js",
       },
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.26.0",
+        "@vevx/kiste": "workspace:*",
         "fast-xml-parser": "^4.5.0",
         "zod": "^3.24.0",
       },

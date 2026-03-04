@@ -19,7 +19,7 @@ mcp:
 
 manifest:
   path: ./packages/varp/src/manifest
-  deps: [shared]
+  deps: [shared, kiste]
   tags: [core]
   stability: stable
 
