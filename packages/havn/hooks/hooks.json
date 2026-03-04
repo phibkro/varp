@@ -1,0 +1,16 @@
+{
+  "description": "Havn plugin hooks — project-aware plugin sync on session end",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/sync-plugins.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
