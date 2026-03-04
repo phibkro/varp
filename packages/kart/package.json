@@ -1,6 +1,6 @@
 {
   "name": "@vevx/kart",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "IDE interface for AI coding agents — progressive code disclosure, LSP navigation, AST editing",
   "type": "module",
   "license": "MIT",

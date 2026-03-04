@@ -1,6 +1,6 @@
 {
   "name": "@vevx/kiste",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Git-backed artifact index for AI agents — tags, provenance, co-change, full-text search",
   "type": "module",
   "license": "MIT",

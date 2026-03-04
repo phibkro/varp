@@ -1,5 +1,35 @@
 # @vevx/kart
 
+## 0.6.0
+
+### Minor Changes
+
+- ed672f1: Add compact directory zoom at level 0 (oxc-based export counts, no LSP) and MCP integration tests for kart_deps, kart_workspace_symbol, kart_inlay_hints
+- 9983997: Add plugin interface for multi-language support (ADR-007). Split TypeScript-hardcoded LSP and AST code into `LspPlugin` and `AstPlugin` interfaces with a `PluginRegistry` that routes by file extension. Adds `LspRuntimes` service for lazy per-language runtime management and `PluginUnavailableError` for structured error responses on unsupported extensions.
+- 97cc547: Redesign zoom API: replace level/resolveTypes with depth-based BFS type graph traversal
+
+  - New parameters: `depth` (BFS hops through type dependencies), `visibility` (exported/all), `kind` (declaration filter), `deep` (include non-imported type refs)
+  - DeclCache: `tsc --declaration --emitDeclarationOnly --incremental` generates `.d.ts` files in `.kart/decls/` with staleness detection
+  - TypeRefs: pure module extracting type references from `.d.ts` content for BFS traversal
+  - BFS follows import chains across files, returning referenced declarations as `referencedFiles`
+  - Graceful fallback to LSP documentSymbol when tsc is unavailable or visibility=all
+
+- be7caac: Add query-based tree-sitter AST plugin factory for multi-language support. Languages provide a grammar config (WASM file + S-expression query using tags.scm convention) and optional hooks for custom behavior. Migrate Rust from hardcoded RustSymbols.ts to factory with RustGrammar + RustHooks. Add PHP language support (grammar + intelephense LSP). Delete RustSymbols.ts — all generic logic in factory, Rust-specific in hooks.
+
+### Patch Changes
+
+- ff8df79: Add coverage reporting infrastructure (strict + integration test tiers)
+- 79ea04f: Update package descriptions to reflect vevx agent toolkit framing
+- 6a11175: Compact MCP tool responses to reduce agent context window usage. `kart_find` strips debug metadata (`durationMs`, `cachedFiles`). `kart_impact` and `kart_deps` strip `range` from tree nodes and convert absolute `uri` to workspace-relative `path`.
+- 19647b4: Extract RustGrammar/RustHooks to pure layer, fixing pure→impure boundary violation
+- 8fd4a4a: Fix issues found during CodeRabbit review across all packages.
+
+  **kart:** Fix FiberFailure unwrapping in `isPluginUnavailable`, fix stale registry reference in `makeLspRuntimes`, extract `registerLspTool` helper reducing ~224 lines of boilerplate.
+
+  **kiste:** Fix transaction rollback using Effect error channel, fix snapshot sort by mtime instead of SHA, replace `as unknown as` casts with `sql.unsafe<T>()` generics, fix version string to 0.2.0.
+
+  **varp:** Deep-freeze cached manifests to prevent cache poisoning, remove broken Stop prompt hook and obsolete SubagentStart hook, consolidate subagent-conventions into CLAUDE.md.
+
 ## 0.5.0
 
 ### Minor Changes
